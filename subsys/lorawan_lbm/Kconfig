@@ -313,6 +313,12 @@ config LORA_BASICS_MODEM_CONTEXT_BUFFER_SIZE
 	int "Context backup/restoration buffer size"
 	default 512
 
+config LORA_BASICS_MODEM_APP_HELPERS
+	bool "Build App helpers from LoRa Basics Modem (mostly for Semtech samples)"
+	select UART_INTERRUPT_DRIVEN
+	default n
+
+
 config LORA_BASICS_MODEM_MAIN_THREAD
 	bool "Build a main loop thread that runs the LBM stack."
 	default n

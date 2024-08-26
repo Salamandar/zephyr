@@ -43,6 +43,8 @@ if(CONFIG_ZEPHYR_LORA_BASICS_MODEM_MODULE)
       ${CMAKE_CURRENT_LIST_DIR}/smtc_modem_hal/smtc_modem_hal.c
     )
 
+    add_subdirectory_ifdef(CONFIG_LORA_BASICS_MODEM_APP_HELPERS app_helpers)
+
   endif()
 
 endif()
