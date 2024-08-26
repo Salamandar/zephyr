@@ -2476,6 +2476,7 @@ LoRa and LoRaWAN:
     - include/zephyr/lorawan_lbm/
     - samples/drivers/lora_lbm/
     - subsys/lorawan_lbm/
+    - samples/subsys/lora_basics_modem/
   labels:
     - "area: LoRa"
   tests:
