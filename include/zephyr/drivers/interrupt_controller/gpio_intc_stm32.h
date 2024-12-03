@@ -117,4 +117,33 @@ void stm32_exti_set_line_src_port(gpio_pin_t line, uint32_t port);
 uint32_t stm32_exti_get_line_src_port(gpio_pin_t line);
 #endif /* CONFIG_EXTI_STM32 */
 
+#if defined(CONFIG_STM32_EXTI_SWI)
+
+/**
+ * @brief set EXTI software interrupt callback
+ *
+ * @param line EXI# line
+ * @param cb   user callback
+ * @param data user data
+ */
+int stm32_exti_set_swi_callback(int line, stm32_exti_callback_t cb, void *data);
+
+/**
+ * @brief unset EXTI software interrupt callback
+ *
+ * @param line EXI# line
+ */
+void stm32_exti_unset_swi_callback(int line);
+
+/**
+ * @brief request EXTI software interrupt generation
+ *
+ * @param line EXI# line
+ * @param cb   user callback
+ * @param data user data
+ */
+void stm32_exti_trigger_swi(int line);
+
+#endif
+
 #endif /* ZEPHYR_DRIVERS_INTERRUPT_CONTROLLER_GPIO_INTC_STM32_H_ */

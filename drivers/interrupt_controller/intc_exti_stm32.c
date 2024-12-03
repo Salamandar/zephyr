@@ -49,6 +49,9 @@ struct __exti_cb {
 struct stm32_exti_data {
 	/* per-line callbacks */
 	struct __exti_cb cb[NUM_EXTI_LINES];
+#if defined(CONFIG_STM32_EXTI_SWI)
+	struct __exti_cb swi_cb[NUM_EXTI_LINES];
+#endif
 };
 
 /**
@@ -120,6 +123,50 @@ static inline gpio_pin_t ll_exti_line_to_linenum(stm32_gpio_irq_line_t line)
 	return LOG2(line);
 }
 
+#if defined(CONFIG_STM32_EXTI_SWI)
+
+__STATIC_INLINE uint32_t LL_EXTI_IsEnabledSWI_0_31(uint32_t ExtiLine)
+{
+  return ((READ_BIT(EXTI->SWIER1, ExtiLine) == (ExtiLine)) ? 1UL : 0UL);
+}
+
+/**
+ * @brief check if a software interrupt was triggered
+ *
+ * @param line line number
+ */
+static inline int stm32_exti_swi_is_pending(int line)
+{
+	if (line < 32) {
+		return LL_EXTI_IsEnabledSWI_0_31(BIT((uint32_t)line));
+	} else {
+		__ASSERT_NO_MSG(line);
+		return 0;
+	}
+}
+
+/**
+ * @brief clear software interrupt bit
+ *
+ * @param line line number
+ */
+static inline void stm32_exti_swi_clear(int line)
+{
+	if (line < 32) {
+#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32g0_exti)
+		LL_EXTI_ClearRisingFlag_0_31(BIT((uint32_t)line));
+		LL_EXTI_ClearFallingFlag_0_31(BIT((uint32_t)line));
+#elif defined(CONFIG_SOC_SERIES_STM32H7X) && defined(CONFIG_CPU_CORTEX_M4)
+		LL_C2_EXTI_ClearFlag_0_31(BIT((uint32_t)line));
+#else
+		LL_EXTI_ClearFlag_0_31(BIT((uint32_t)line));
+#endif
+	} else {
+		__ASSERT_NO_MSG(line);
+	}
+}
+#endif
+
 /**
  * @brief EXTI ISR handler
  *
@@ -134,6 +181,7 @@ static void stm32_exti_isr(const void *exti_range)
 	const struct stm32_exti_range *range = exti_range;
 	stm32_gpio_irq_line_t line;
 	uint32_t line_num;
+	struct __exti_cb *callback;
 
 	/* see which bits are set */
 	for (uint8_t i = 0; i <= range->len; i++) {
@@ -142,16 +190,25 @@ static void stm32_exti_isr(const void *exti_range)
 
 		/* check if interrupt is pending */
 		if (stm32_exti_is_pending(line) != 0) {
+#if defined(CONFIG_STM32_EXTI_SWI)
+			if (stm32_exti_swi_is_pending(line)) {
+				callback = data->swi_cb[line_num];
+			} else {
+				callback = data->cb[line_num];
+			}
+#else
+			callback = data->cb[line_num];
+#endif
 			/* clear pending interrupt */
 			stm32_exti_clear_pending(line);
 
 			/* run callback only if one is registered */
-			if (!data->cb[line_num].cb) {
+			if (!callback->cb) {
 				continue;
 			}
 
 			/* `line` can be passed as-is because LL_EXTI_LINE_n is (1 << n) */
-			data->cb[line_num].cb(line, data->cb[line_num].data);
+			callback->cb(line, callback->data);
 		}
 	}
 }
@@ -403,3 +460,48 @@ uint32_t stm32_exti_get_line_src_port(gpio_pin_t line)
 
 	return port;
 }
+
+#if defined(CONFIG_STM32_EXTI_SWI)
+
+void stm32_exti_set_swi_callback(int line, stm32_exti_callback_t cb, void *arg)
+{
+	const struct device *const dev = DEVICE_DT_GET(EXTI_NODE);
+	struct stm32_exti_data *data = dev->data;
+
+	if ((data->swi_cb[line].cb == cb) && (data->swi_cb[line].data == arg)) {
+		return 0;
+	}
+
+	/* if callback already exists/maybe-running return busy */
+	if (data->swi_cb[line].cb != NULL) {
+		return -EBUSY;
+	}
+
+	data->swi_cb[line].cb = cb;
+	data->swi_cb[line].data = arg;
+
+	return 0;
+}
+
+void stm32_exti_unset_swi_callback(int line)
+{
+	const struct device *const dev = DEVICE_DT_GET(EXTI_NODE);
+	struct stm32_exti_data *data = dev->data;
+
+	data->swi_cb[line].cb = NULL;
+	data->swi_cb[line].data = NULL;
+}
+
+void stm32_exti_trigger_swi(int line)
+{
+	const struct device *const dev = DEVICE_DT_GET(EXTI_NODE);
+	struct stm32_exti_data *data = dev->data;
+
+	if (line >= 32) {
+		__ASSERT_NO_MSG(line);
+	}
+
+	LL_EXTI_GenerateSWI_0_31(BIT((uint32_t)line));
+}
+
+#endif
